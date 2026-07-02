@@ -60,6 +60,19 @@ if(UNIX)
   link_libraries(pthread)
 endif()
 
+# The AMX bytecode format used by SA-MP / open.mp is always 32-bit cells,
+# regardless of the host architecture the compiler itself runs on. Upstream
+# CI enforces this today by passing "-m32" (see .travis.yml), which only
+# works on x86 hosts with 32-bit multilib support. On any other host arch
+# (e.g. aarch64), "-m32" is unavailable, and without it amx.h falls back to
+# __64BIT__ -> PAWN_CELL_SIZE=64, which then fails to build because HAVE_I64
+# is never defined on non-Windows 64-bit targets (see source/amx/amxdbg.c).
+# Force 32-bit cells explicitly and portably instead of depending on -m32.
+if(NOT DEFINED PAWN_CELL_SIZE)
+  set(PAWN_CELL_SIZE 32)
+endif()
+add_definitions(-DPAWN_CELL_SIZE=${PAWN_CELL_SIZE})
+
 if(APPLE)
   set(CMAKE_MACOSX_RPATH ON)
   set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
