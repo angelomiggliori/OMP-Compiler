@@ -1,0 +1,65 @@
+name: ARM64 build
+
+# Compila o pawncc/pawnc/pawndisasm nativamente para linux/arm64 usando
+# cross-compilation com gcc-aarch64-linux-gnu (o mesmo caminho testado
+# manualmente: nenhuma dependência de assembly x86, apenas C portável).
+#
+# Roda em: push para main/master, pull requests que tocam source/compiler
+# ou source/amx, e manualmente via workflow_dispatch.
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - "source/compiler/**"
+      - "source/amx/**"
+      - "cmake/**"
+      - ".github/workflows/arm64-release.yml"
+  pull_request:
+    paths:
+      - "source/compiler/**"
+      - "source/amx/**"
+      - "cmake/**"
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar toolchain cross ARM64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gcc-aarch64-linux-gnu g++-aarch64-linux-gnu qemu-user
+
+      - name: Configurar (CMake + toolchain file)
+        run: |
+          cmake -S source/compiler -B build-arm64 \
+            -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/cmake/aarch64-linux-gnu.toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_C_FLAGS="-Wno-address-of-packed-member" \
+            -DBUILD_TESTING=OFF
+
+      - name: Compilar
+        run: cmake --build build-arm64 -j$(nproc)
+
+      - name: Checar arquitetura dos binários
+        run: file build-arm64/pawncc build-arm64/libpawnc.so build-arm64/pawndisasm
+
+      - name: Smoke test via QEMU (compila um .p de exemplo)
+        run: |
+          export QEMU_LD_PREFIX=/usr/aarch64-linux-gnu
+          qemu-aarch64 build-arm64/pawncc examples/sieve.p -o/tmp/sieve.amx
+          test -f /tmp/sieve.amx
+
+      - name: Empacotar
+        run: |
+          mkdir -p dist
+          cp build-arm64/pawncc build-arm64/libpawnc.so build-arm64/pawndisasm dist/
+          tar -C dist -czf pawnc-arm64-linux.tar.gz .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pawnc-arm64-linux
+          path: pawnc-arm64-linux.tar.gz
