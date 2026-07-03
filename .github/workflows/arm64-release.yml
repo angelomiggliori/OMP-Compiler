@@ -22,6 +22,9 @@ on:
       - "cmake/**"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-arm64:
     runs-on: ubuntu-24.04
@@ -63,3 +66,13 @@ jobs:
         with:
           name: pawnc-arm64-linux
           path: pawnc-arm64-linux.tar.gz
+
+      - name: Publicar Release arm64-latest
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: arm64-latest
+          name: ARM64 Latest
+          files: pawnc-arm64-linux.tar.gz
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
